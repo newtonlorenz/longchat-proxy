@@ -1,0 +1,21 @@
+[Unit]
+Description=LongChat rolling-context proxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=longchat
+Group=longchat
+EnvironmentFile=/etc/longchat-proxy.env
+ExecStart=/opt/longchat-proxy/.venv/bin/longchat-proxy serve
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/longchat-proxy
+
+[Install]
+WantedBy=multi-user.target

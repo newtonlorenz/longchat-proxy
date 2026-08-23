@@ -1,0 +1,46 @@
+name: Bug report
+description: Report a reproducible problem with LongChat Proxy
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please remove API keys, private conversations, public IP addresses and other sensitive data.
+  - type: input
+    id: version
+    attributes:
+      label: LongChat Proxy version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, client, model server and model family.
+    validations:
+      required: true
+  - type: textarea
+    id: configuration
+    attributes:
+      label: Relevant redacted configuration
+      description: Output from `longchat-proxy print-config`, with identifying paths removed.
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour and logs
+    validations:
+      required: true

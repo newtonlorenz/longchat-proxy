@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>ai.longchat-proxy</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/YOU/.local/bin/longchat-proxy</string>
+    <string>--env-file</string>
+    <string>/Users/YOU/.config/longchat-proxy.env</string>
+    <string>serve</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/YOU/Library/Logs/longchat-proxy.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/YOU/Library/Logs/longchat-proxy-error.log</string>
+</dict>
+</plist>

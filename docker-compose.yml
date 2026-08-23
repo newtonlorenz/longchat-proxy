@@ -1,0 +1,24 @@
+services:
+  longchat-proxy:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      LONGCHAT_HOST: 0.0.0.0
+      LONGCHAT_CLIENT_API_KEY: ${LONGCHAT_CLIENT_API_KEY:?Set LONGCHAT_CLIENT_API_KEY in .env}
+      LONGCHAT_UPSTREAM_BASE_URL: http://host.docker.internal:1234
+      LONGCHAT_STATE_PATH: /data/state.sqlite3
+    ports:
+      - "1235:1235"
+    volumes:
+      - longchat-state:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  longchat-state:
