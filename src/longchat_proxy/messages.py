@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from typing import Any
 
 MEMORY_HEADING = "LongChat rolling memory"
+TIMESTAMP_LINE = re.compile(r"(?im)^\s*Current date and time:[^\n]*(?:\n|$)")
 
 
 def canonical_hash(messages: list[dict[str, Any]], count: int) -> str:
@@ -21,6 +23,44 @@ def split_instructions(
     while index < len(messages) and messages[index].get("role") in {"system", "developer"}:
         index += 1
     return messages[:index], messages[index:]
+
+
+def sanitize_client_messages(
+    messages: list[dict[str, Any]],
+    *,
+    strip_system_timestamp: bool = False,
+    drop_system_sections: tuple[str, ...] = (),
+    system_append: str = "",
+) -> list[dict[str, Any]]:
+    """Remove configured volatile boilerplate from leading instructions."""
+    cleaned = [dict(message) for message in messages]
+    instruction_count = 0
+    while instruction_count < len(cleaned) and cleaned[instruction_count].get("role") in {
+        "system",
+        "developer",
+    }:
+        item = cleaned[instruction_count]
+        content = item.get("content")
+        if isinstance(content, str):
+            if strip_system_timestamp:
+                content = TIMESTAMP_LINE.sub("", content)
+            for heading in drop_system_sections:
+                pattern = re.compile(
+                    rf"(?ims)(?:^|\n)#[#]*[ \t]+{re.escape(heading)}[ \t]*\n"
+                    r".*?(?=(?:\n#[#]*[ \t]+\S)|\Z)"
+                )
+                content = pattern.sub("\n", content)
+            item["content"] = content.strip()
+        instruction_count += 1
+
+    appendix = system_append.strip()
+    if appendix:
+        if instruction_count:
+            original = content_text(cleaned[0].get("content")).strip()
+            cleaned[0]["content"] = f"{original}\n\n{appendix}" if original else appendix
+        else:
+            cleaned.insert(0, {"role": "system", "content": appendix})
+    return cleaned
 
 
 def content_text(content: Any) -> str:

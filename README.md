@@ -54,6 +54,8 @@ unchanged.
 - Reuses summaries when the client sends the same conversation prefix again.
 - Supports private in-memory state, persistent SQLite state, or stateless operation.
 - Accepts an optional exact Hugging Face `tokenizer.json`; otherwise uses a conservative estimate.
+- Can compact before the physical limit to trade context detail for latency and prompt-cache reuse.
+- Can enforce provider-specific main-request fields and remove configured volatile client boilerplate.
 - Hides the internal summariser from `/v1/models` by default.
 - Exposes safe health, readiness and authenticated status endpoints.
 - Fails explicitly if compaction is required but cannot be completed safely.
@@ -137,8 +139,25 @@ LONGCHAT_SUMMARY_TOKENS=400
 LONGCHAT_STATE_MODE=sqlite
 ```
 
-The main request remains under the client's control. LongChat caps its output allowance but does
-not otherwise enable or disable main-model thinking.
+The main request remains under the client's control by default. LongChat caps its output allowance
+but does not otherwise enable or disable main-model thinking unless you configure an override.
+
+To enforce non-thinking mode even when a client sends conflicting options, configure a main-request
+override:
+
+```dotenv
+LONGCHAT_REQUEST_EXTRA_BODY={"chat_template_kwargs":{"enable_thinking":false}}
+```
+
+Some clients inject a changing timestamp and tool schema into every system prompt, which defeats
+prompt caching. If you do not use those client tools, the following optional controls keep the
+stable parts of the prompt while removing that boilerplate:
+
+```dotenv
+LONGCHAT_DROP_TOOLS=true
+LONGCHAT_STRIP_SYSTEM_TIMESTAMP=true
+LONGCHAT_DROP_SYSTEM_SECTIONS=Tools
+```
 
 ## Ollama example
 
@@ -249,6 +268,7 @@ All settings use the `LONGCHAT_` prefix.
 | `CONTEXT_TOKENS` | `8192` | Main model's loaded context size. |
 | `MAX_OUTPUT_TOKENS` | `2048` | Hard response-token cap and reserved allowance. |
 | `RECENT_TOKENS` | `1600` | Approximate recent verbatim window. |
+| `COMPACTION_TRIGGER_TOKENS` | `0` | Optional earlier input threshold; zero uses the physical budget. |
 | `SUMMARY_TOKENS` | `400` | Maximum helper-model summary output. |
 | `SAFETY_TOKENS` | `384` | Extra margin for templates/counting differences. |
 | `MIN_MESSAGES` | `6` | Minimum turn count before compaction is allowed. |
@@ -259,6 +279,11 @@ All settings use the `LONGCHAT_` prefix.
 | `SUMMARY_CONTEXT_TOKENS` | `8192` | Helper model's loaded context size. |
 | `SUMMARY_TEMPERATURE` | `0.2` | Helper sampling temperature. |
 | `SUMMARY_EXTRA_BODY` | `{}` | Provider-specific JSON merged into helper requests. |
+| `REQUEST_EXTRA_BODY` | `{}` | Enforced provider-specific JSON merged into main requests. |
+| `DROP_TOOLS` | `false` | Remove tool definitions and choices from main requests. |
+| `STRIP_SYSTEM_TIMESTAMP` | `false` | Remove changing `Current date and time:` instruction lines. |
+| `DROP_SYSTEM_SECTIONS` | unset | Comma-separated Markdown headings removed from leading instructions. |
+| `SYSTEM_APPEND` | unset | Stable guidance appended to the first instruction message. |
 | `TOKENIZER_PATH` | unset | Optional Hugging Face `tokenizer.json`. |
 | `ESTIMATOR_MULTIPLIER` | `1.10` | Conservatism applied to estimated counts. |
 | `STATE_MODE` | `memory` | `memory`, `sqlite`, or `off`. |

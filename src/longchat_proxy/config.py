@@ -90,6 +90,7 @@ class Settings:
     context_tokens: int = 8192
     max_output_tokens: int = 2048
     recent_tokens: int = 1600
+    compaction_trigger_tokens: int = 0
     summary_tokens: int = 400
     safety_tokens: int = 384
     min_messages: int = 6
@@ -101,6 +102,12 @@ class Settings:
     summary_context_tokens: int = 8192
     summary_temperature: float = 0.2
     summary_extra_body: dict[str, Any] | None = None
+
+    request_extra_body: dict[str, Any] | None = None
+    drop_tools: bool = False
+    strip_system_timestamp: bool = False
+    drop_system_sections: tuple[str, ...] = ()
+    system_append: str = ""
 
     tokenizer_path: str = ""
     estimator_multiplier: float = 1.10
@@ -130,6 +137,7 @@ class Settings:
             context_tokens=_int("CONTEXT_TOKENS", 8192),
             max_output_tokens=_int("MAX_OUTPUT_TOKENS", 2048),
             recent_tokens=_int("RECENT_TOKENS", 1600),
+            compaction_trigger_tokens=_int("COMPACTION_TRIGGER_TOKENS", 0),
             summary_tokens=_int("SUMMARY_TOKENS", 400),
             safety_tokens=_int("SAFETY_TOKENS", 384),
             min_messages=_int("MIN_MESSAGES", 6),
@@ -140,6 +148,11 @@ class Settings:
             summary_context_tokens=_int("SUMMARY_CONTEXT_TOKENS", 8192),
             summary_temperature=_float("SUMMARY_TEMPERATURE", 0.2),
             summary_extra_body=_json_object("SUMMARY_EXTRA_BODY"),
+            request_extra_body=_json_object("REQUEST_EXTRA_BODY"),
+            drop_tools=_bool("DROP_TOOLS", False),
+            strip_system_timestamp=_bool("STRIP_SYSTEM_TIMESTAMP", False),
+            drop_system_sections=_csv("DROP_SYSTEM_SECTIONS"),
+            system_append=_env("SYSTEM_APPEND"),
             tokenizer_path=_env("TOKENIZER_PATH"),
             estimator_multiplier=_float("ESTIMATOR_MULTIPLIER", 1.10),
             state_mode=_env("STATE_MODE", "memory").lower(),
@@ -196,6 +209,12 @@ class Settings:
                 raise ConfigurationError(f"LONGCHAT_{name} must be positive")
         if self.context_tokens <= self.max_output_tokens + self.safety_tokens + 256:
             raise ConfigurationError("Context is too small for the output and safety reserves")
+        if self.compaction_trigger_tokens < 0:
+            raise ConfigurationError("LONGCHAT_COMPACTION_TRIGGER_TOKENS cannot be negative")
+        if 0 < self.compaction_trigger_tokens < 512:
+            raise ConfigurationError(
+                "LONGCHAT_COMPACTION_TRIGGER_TOKENS must be zero or at least 512"
+            )
         if self.summary_context_tokens <= self.summary_tokens + self.safety_tokens + 256:
             raise ConfigurationError("Summary context is too small for its output reserve")
         if self.state_mode not in {"memory", "sqlite", "off"}:
@@ -214,4 +233,5 @@ class Settings:
         for key in ("client_api_key", "upstream_api_key", "summary_api_key"):
             result[key] = "<set>" if result[key] else "<unset>"
         result["summary_extra_body"] = self.summary_extra_body or {}
+        result["request_extra_body"] = self.request_extra_body or {}
         return result

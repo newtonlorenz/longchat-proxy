@@ -12,6 +12,7 @@ from .messages import (
     canonical_hash,
     merge_instructions_and_memory,
     retained_user_boundary,
+    sanitize_client_messages,
     split_instructions,
     summary_document,
 )
@@ -123,6 +124,16 @@ class Compactor:
 
     def cap_output(self, body: dict[str, Any]) -> tuple[dict[str, Any], int]:
         capped = dict(body)
+        for key, value in (self.settings.request_extra_body or {}).items():
+            if key in {"messages", "model", "stream", "max_tokens", "max_completion_tokens"}:
+                continue
+            if isinstance(value, dict) and isinstance(capped.get(key), dict):
+                capped[key] = {**capped[key], **value}
+            else:
+                capped[key] = value
+        if self.settings.drop_tools:
+            for key in ("tools", "tool_choice", "parallel_tool_calls"):
+                capped.pop(key, None)
         requested = capped.get("max_completion_tokens", capped.get("max_tokens"))
         try:
             requested_tokens = (
@@ -222,10 +233,17 @@ class Compactor:
         raw_messages = capped.get("messages")
         if not isinstance(raw_messages, list):
             raise CompactionError("messages must be an array")
-        messages = [message for message in raw_messages if isinstance(message, dict)]
+        messages = sanitize_client_messages(
+            [message for message in raw_messages if isinstance(message, dict)],
+            strip_system_timestamp=self.settings.strip_system_timestamp,
+            drop_system_sections=self.settings.drop_system_sections,
+            system_append=self.settings.system_append,
+        )
         capped["messages"] = messages
         initial_tokens = self._estimated_request_tokens(capped)
         input_budget = self.settings.context_tokens - output_tokens - self.settings.safety_tokens
+        if self.settings.compaction_trigger_tokens:
+            input_budget = min(input_budget, self.settings.compaction_trigger_tokens)
         if initial_tokens <= input_budget:
             return CompactionResult(capped, estimated_input_tokens=initial_tokens)
 

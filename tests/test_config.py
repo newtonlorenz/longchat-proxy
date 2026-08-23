@@ -31,3 +31,8 @@ def test_openai_url_accepts_base_with_or_without_v1() -> None:
         "http://localhost:1234/v1/models"
     )
     assert openai_url("http://localhost:1234/v1", "/custom") == ("http://localhost:1234/v1/custom")
+
+
+def test_compaction_trigger_must_be_zero_or_useful() -> None:
+    with pytest.raises(ConfigurationError, match="zero or at least 512"):
+        Settings(compaction_trigger_tokens=128).validate()

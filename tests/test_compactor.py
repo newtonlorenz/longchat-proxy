@@ -96,3 +96,28 @@ async def test_repeated_prefix_uses_cached_summary() -> None:
     assert first.compacted and second.compacted
     assert second.cache_hit is True
     assert summarizer.calls == first_calls
+
+
+@pytest.mark.asyncio
+async def test_main_request_controls_and_early_trigger() -> None:
+    settings = Settings(
+        context_tokens=8192,
+        max_output_tokens=1024,
+        recent_tokens=400,
+        compaction_trigger_tokens=1500,
+        summary_tokens=120,
+        summary_context_tokens=1600,
+        request_extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+        drop_tools=True,
+    )
+    body = long_body()
+    body["tools"] = [{"type": "function", "function": {"name": "volatile"}}]
+    body["chat_template_kwargs"] = {"reasoning_effort": "low"}
+    compactor = Compactor(settings, TokenCounter(), MemoryStore(), FakeSummarizer())  # type: ignore[arg-type]
+    result = await compactor.compact(body)
+    assert result.compacted is True
+    assert "tools" not in result.body
+    assert result.body["chat_template_kwargs"] == {
+        "reasoning_effort": "low",
+        "enable_thinking": False,
+    }

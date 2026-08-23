@@ -3,6 +3,7 @@ from __future__ import annotations
 from longchat_proxy.messages import (
     merge_instructions_and_memory,
     retained_user_boundary,
+    sanitize_client_messages,
     split_instructions,
     summary_document,
 )
@@ -50,3 +51,28 @@ def test_summary_document_preserves_tool_metadata() -> None:
         }
     )
     assert document["tool_calls"][0]["function"]["name"] == "weather"
+
+
+def test_client_boilerplate_sanitization_is_opt_in() -> None:
+    original = [
+        {
+            "role": "system",
+            "content": (
+                "Be helpful.\nCurrent date and time: tomorrow somehow\n\n"
+                "# Tools\nvolatile tool schema\n\n# Style\nBe direct."
+            ),
+        },
+        {"role": "user", "content": "Hello"},
+    ]
+    cleaned = sanitize_client_messages(
+        original,
+        strip_system_timestamp=True,
+        drop_system_sections=("Tools",),
+        system_append="Always finish the answer.",
+    )
+    system = cleaned[0]["content"]
+    assert "Current date and time" not in system
+    assert "volatile tool schema" not in system
+    assert "# Style" in system
+    assert system.endswith("Always finish the answer.")
+    assert "Current date and time" in original[0]["content"]
