@@ -2,6 +2,10 @@
 
 All notable changes will be documented here.
 
+## 0.1.2 - 2026-08-24
+
+- Prevent internal transport and compaction exception details from being reflected to API clients.
+
 ## 0.1.1 - 2026-08-23
 
 - Accept an optional early-compaction threshold for latency and prompt-cache tuning.

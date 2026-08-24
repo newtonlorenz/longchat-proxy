@@ -87,3 +87,25 @@ async def test_status_never_exposes_secret() -> None:
         assert response.status_code == 200
         assert "do-not-leak" not in response.text
         assert "also-secret" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_transport_exceptions_are_not_exposed_to_clients() -> None:
+    internal_detail = "private.internal.example:4321"
+
+    def broken_upstream(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError(internal_detail, request=request)
+
+    app = create_app(Settings(), transport=httpx.MockTransport(broken_upstream))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://proxy"
+        ) as client,
+    ):
+        ready = await client.get("/longchat/ready")
+        response = await client.post("/v1/embeddings", json={"input": "test"})
+        assert ready.status_code == 503
+        assert response.status_code == 502
+        assert internal_detail not in ready.text
+        assert internal_detail not in response.text

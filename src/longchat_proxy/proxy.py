@@ -186,7 +186,8 @@ def create_app(
             )
             response.raise_for_status()
         except httpx.HTTPError as error:
-            return _error(503, f"Upstream unavailable: {error}", "upstream_unavailable")
+            LOGGER.warning("readiness check failed: %s", error)
+            return _error(503, "Upstream unavailable", "upstream_unavailable")
         return JSONResponse({"status": "ready"})
 
     @app.get("/longchat/status")
@@ -252,13 +253,17 @@ def create_app(
                 if result.cache_hit:
                     metrics.cache_hits += 1
                 metrics.summary_calls += result.summaries_generated
-            except (json.JSONDecodeError, ValueError) as error:
-                return _error(400, f"Invalid request: {error}", "invalid_request_error")
+            except (json.JSONDecodeError, ValueError):
+                return _error(400, "Invalid JSON request body", "invalid_request_error")
             except CompactionError as error:
                 metrics.compaction_errors += 1
                 LOGGER.warning("compaction failed: %s", error)
                 if configured.on_compaction_error == "error":
-                    return _error(503, str(error), "compaction_error")
+                    return _error(
+                        503,
+                        "Conversation compaction could not be completed safely",
+                        "compaction_error",
+                    )
                 payload, _ = request.app.state.compactor.cap_output(payload)
                 body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
 
@@ -291,7 +296,8 @@ def create_app(
                 )
             except (httpx.HTTPError, ValueError) as error:
                 metrics.upstream_errors += 1
-                return _error(502, f"Upstream request failed: {error}", "upstream_error")
+                LOGGER.warning("model-list request failed: %s", error)
+                return _error(502, "Upstream request failed", "upstream_error")
 
         try:
             upstream_request = request.app.state.client.build_request(
@@ -303,7 +309,8 @@ def create_app(
             upstream_response = await request.app.state.client.send(upstream_request, stream=True)
         except httpx.HTTPError as error:
             metrics.upstream_errors += 1
-            return _error(502, f"Upstream request failed: {error}", "upstream_error")
+            LOGGER.warning("upstream request failed: %s", error)
+            return _error(502, "Upstream request failed", "upstream_error")
 
         response_headers = {**_response_headers(upstream_response), **metadata}
         return StreamingResponse(
